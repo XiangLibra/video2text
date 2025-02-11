@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>MP4/MP3 → MP3 → 語音辨識 & TXT</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    #progressContainer { margin: 20px auto; width: 50%; display: none; }
+    progress { width: 100%; }
+    #downloadButton { display: none; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<h1>上傳 MP4 或 MP3，轉成語音文字</h1>
+
+<form onsubmit="event.preventDefault();">
+  <label for="videos">選擇 MP4 或 MP3 檔案：</label>
+  <input type="file" id="videos" name="videos" accept=".mp4,.mp3" multiple required><br><br>
+  <button type="button" id="convertButton" onclick="uploadVideos()">開始轉換</button>  
+</form>
+
+<div id="progressContainer">
+  <progress id="progressBar" value="0" max="100"></progress>
+  <div>目前進度：<span id="progressText">0</span>%</div>
+</div>
+
+<button type="button" id="downloadButton" style="display:none;" onclick="downloadZipFile()">下載 ZIP</button>
+
+<div id="results" style="margin-top:20px;">
+  <!-- 顯示辨識結果 -->
+</div>
+
+<script>
+async function uploadVideos() {
+  const videoFiles = document.getElementById('videos').files;
+  if (!videoFiles.length) {
+    alert("請上傳 MP4 或 MP3 檔案！");
+    return;
+  }
+
+  const formData = new FormData();
+  for (let file of videoFiles) {
+    formData.append('videos', file);
+  }
+
+  const convertButton = document.getElementById('convertButton');
+  const downloadButton = document.getElementById('downloadButton');
+  const progressContainer = document.getElementById('progressContainer');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  const resultsDiv = document.getElementById('results');
+
+  // 顯示上傳/處理中 UI
+  convertButton.disabled = true;
+  convertButton.innerText = "轉換中...";
+  downloadButton.style.display = 'none';
+  progressContainer.style.display = 'block';
+  progressBar.value = 0;
+  progressText.innerText = 0;
+  resultsDiv.innerHTML = "";
+
+  try {
+    let resp = await fetch('/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!resp.ok) {
+      let errorMsg = await resp.text();
+      alert("上傳或轉換失敗：" + errorMsg);
+      resetUI();
+      return;
+    }
+
+    let data = await resp.json();
+
+    // 模擬進度到 100%
+    progressBar.value = 100;
+    progressText.innerText = 100;
+
+    if (data.success) {
+      // 顯示 ZIP 下載按鈕
+      downloadButton.style.display = 'block';
+
+      // 顯示語音辨識結果
+      if (data.audio_files_info && data.audio_files_info.length > 0) {
+        let html = "<h3>語音辨識結果</h3>";
+        data.audio_files_info.forEach((audioInfo, idx) => {
+          html += `
+            <div style="text-align:left; margin:10px auto; width:80%; border:1px solid #ccc; padding:10px;">
+              <strong>原始檔案：</strong> ${audioInfo.original_filename}<br/>
+              <strong>MP3 檔名：</strong> ${audioInfo.mp3_filename}<br/>
+              <strong>TXT 檔名：</strong> ${audioInfo.txt_filename}<br/>
+              <strong>辨識內容：</strong> ${audioInfo.transcription}
+            </div>
+          `;
+        });
+        resultsDiv.innerHTML = html;
+      }
+      alert(data.message || "轉換及語音辨識完成，已產生 TXT 檔！");
+    } else {
+      alert("處理失敗：" + (data.error || "未知錯誤"));
+    }
+  } catch (e) {
+    alert("發生錯誤：" + e);
+  }
+
+  resetUI();
+
+  function resetUI(){
+    convertButton.disabled = false;
+    convertButton.innerText = "開始轉換";
+    progressContainer.style.display = 'none';
+    progressBar.value = 0;
+    progressText.innerText = 0;
+  }
+}
+
+function downloadZipFile() {
+  // 直接導向下載路由
+  window.location.href = '/download_zip';
+}
+</script>
+
+</body>
+</html>

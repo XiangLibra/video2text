@@ -1,0 +1,5 @@
+flask
+moviepy
+opencc
+xinference
+werkzeug
